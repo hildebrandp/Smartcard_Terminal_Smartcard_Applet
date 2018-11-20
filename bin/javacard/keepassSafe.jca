@@ -1,5 +1,5 @@
 // converted by version 1.3
-// on Tue Nov 20 03:34:21 CET 2018
+// on Tue Oct 30 20:29:09 CET 2018
 
 .package keepassSafe {
 	.aid 0x11:0x22:0x33:0x44:0x55:0x66:0x77:0x88;
@@ -409,7 +409,6 @@
 			public static final short SW_PIN_TRIES_REMAINING = 25536;		// S
 			public static final short SW_COMMAND_NOT_ALLOWED_GENERAL = 26880;		// S
 			public static final short SW_CARD_LOCKED = 25168;		// S
-			public static final short SW_PUK_CORRECT = -28528;		// S
 			static final byte CLA_NUMBER = -128;		// B
 			static final byte INS_INIT = 32;		// B
 			static final byte INS_PIN_VERIFY = 33;		// B
@@ -965,27 +964,20 @@
 					sor;
 					invokestatic 27;		// javacard/framework/ISOException.throwIt(S)V
 				L16:	sload 6;
-					s2b;
-					bspush 8;
-					if_scmpne L18;
-				L17:	sspush -28528;
-					invokestatic 27;		// javacard/framework/ISOException.throwIt(S)V
-					goto L21;
-				L18:	sload 6;
 					bspush 8;
 					ssub;
 					s2b;
 					sconst_2;
-					if_scmplt L20;
-				L19:	sload 6;
+					if_scmplt L18;
+				L17:	sload 6;
 					bspush 8;
 					ssub;
 					s2b;
 					bspush 16;
-					if_scmple L21;
-				L20:	sspush 26368;
+					if_scmple L19;
+				L18:	sspush 26368;
 					invokestatic 27;		// javacard/framework/ISOException.throwIt(S)V
-				L21:	aload_2;
+				L19:	aload_2;
 					sload 5;
 					bspush 8;
 					sadd;

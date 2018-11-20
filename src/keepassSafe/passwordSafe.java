@@ -70,6 +70,7 @@ public class passwordSafe extends Applet
     public static final short SW_PIN_TRIES_REMAINING = (short)0x63C0;
     public static final short SW_COMMAND_NOT_ALLOWED_GENERAL = (short)0x6900;
     public static final short SW_CARD_LOCKED = (short)0x6250;
+    public static final short SW_PUK_CORRECT = (short)0x9090;
     
     //Variables for states
     private byte state;
@@ -411,12 +412,13 @@ public class passwordSafe extends Applet
         }
         
         //Check if PUK is correct
-        if(! puk.check(buf, offset_cdata, PUK_LENGTH)) {
+        if(!puk.check(buf, offset_cdata, PUK_LENGTH)) {
 	        ISOException.throwIt((short)(SW_PIN_TRIES_REMAINING | puk.getTriesRemaining()));
         }
         
-        //Check lenght of recived PIN
-        if( (byte)(lc - PUK_LENGTH) < PIN_MIN_LENGTH || (byte)(lc - PUK_LENGTH) > PIN_MAX_LENGTH) {
+        if ((byte)lc == PUK_LENGTH){
+	        ISOException.throwIt(SW_PUK_CORRECT);
+        } else if((byte)(lc - PUK_LENGTH) < PIN_MIN_LENGTH || (byte)(lc - PUK_LENGTH) > PIN_MAX_LENGTH) {
 			ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
 		}
 		
