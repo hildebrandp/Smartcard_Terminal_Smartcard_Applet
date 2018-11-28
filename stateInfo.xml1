@@ -7,11 +7,11 @@
 <FileNodes>
 <fnode>
 <fileName>src\keepassSafe\fileSystem.java</fileName>
-<line>34</line>
+<line>31</line>
 </fnode>
-<ActiveFile>
+<fnode>
 <fileName>src\keepassSafe\passwordSafe.java</fileName>
-<line>48</line>
-</ActiveFile>
+<line>233</line>
+</fnode>
 </FileNodes>
 </StateInfo>
