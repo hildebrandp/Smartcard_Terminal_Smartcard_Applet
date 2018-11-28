@@ -24,6 +24,8 @@ package keepassSafe;
 
 import javacard.framework.*;
 import javacard.security.RandomData;
+import javacard.security.*;
+import javacardx.crypto.*;
 
 public class passwordSafe extends Applet
 {
@@ -85,7 +87,8 @@ public class passwordSafe extends Applet
 	private RandomData randomKey;
 	private fileSystem myfile;
 
-
+	private byte[] aesKey;
+	
 	//Method which is called one time Applet is beeing installed
 	public static void install(byte[] buffer, short offset, byte length) {
         new passwordSafe(); 
@@ -103,6 +106,8 @@ public class passwordSafe extends Applet
         masterPW = MASTER_PW_STORED_NO;
         masterPWlength = (byte)0; 
 
+		aesKey = new byte[32];
+		
 		//Create RAM Array
         temp_data = JCSystem.makeTransientByteArray((short)2, JCSystem.CLEAR_ON_DESELECT);
         
@@ -267,6 +272,11 @@ public class passwordSafe extends Applet
 	        ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
         }
         
+        //Create Hash Value of the PIN and store it in aesKey
+        MessageDigest hash = MessageDigest.getInstance(MessageDigest.ALG_SHA_256, false);
+        hash.reset();
+        hash.doFinal(buf, offset_cdata, lc, aesKey, (short)0x00);
+        
         //Pad the PIN to max length and update PIN Variable
         Util.arrayFillNonAtomic(buf, (short)(offset_cdata + lc), (short)(PIN_MAX_LENGTH - lc), (byte) 0x00);
         pin.update(buf, offset_cdata, PIN_MAX_LENGTH);
@@ -309,7 +319,20 @@ public class passwordSafe extends Applet
         }
         
         //Check if P1 and P2 are correct
-        if (p1 != (byte)0x01 && p2 != (byte)0x00) {
+        if (p1 == (byte)0x01 && p2 == (byte)0x01) {
+        	//Decrypt buffer
+	        byte[] tmp = new byte[lc];
+	        Util.arrayCopy(buf, offset_cdata, tmp, (short)0, lc);
+	        byte[] decrypted = decryptData(tmp, lc);
+	        
+	        for(short i = 0; i < 16; i++){
+		        if (decrypted[i] != (byte)0xFF){
+			        lc = (short)(16 - i);
+			        Util.arrayCopy(decrypted, (short)i, buf, offset_cdata, lc);
+			        break;
+		        }
+	        }	                
+        } else if (p1 != (byte)0x01 && p2 != (byte)0x00) {
 	        ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
         }
         
@@ -357,7 +380,35 @@ public class passwordSafe extends Applet
         offset_cdata = apdu.getOffsetCdata();
         
         //Check if P1 and P2 are correct
-        if ( p1 != (byte)0x00 && p2 != (byte)0x02 ) {
+        if ( p1 == (byte)0x00 && p2 == (byte)0x01 ) {
+        	//Decrypt buffer
+	        byte[] tmp1 = new byte[(short)(lc / 2)];
+	        byte[] tmp2 = new byte[(short)(lc / 2)];
+	        Util.arrayCopy(buf, offset_cdata, tmp1, (short)0, (short)(lc / 2));
+	        Util.arrayCopy(buf, (short)(offset_cdata + (lc / 2)), tmp2, (short)0, (short)(lc / 2));
+	        
+	        tmp1 = decryptData(tmp1, (short)(lc / 2));
+	        tmp2 = decryptData(tmp2, (short)(lc / 2));
+	        short L1 = 0,L2 = 0;
+	        
+	        for(short i = 0; i < 16; i++){
+		        if (tmp1[i] != (byte)0xFF){
+			        L1 = (short)(16 - i);
+			        Util.arrayCopy(tmp1, (short)i, buf, offset_cdata, L1);
+			        break;
+		        }
+	        }
+	        
+	        for(short o = 0; o < 16; o++){
+		        if (tmp2[o] != (byte)0xFF){
+			        L2 = (short)(16 - o);
+			        Util.arrayCopy(tmp2, (short)o, buf, (short)(offset_cdata + L1), L2);
+			        break;
+		        }
+	        }
+	        lc = (short)(L1 + L2);
+	        
+        } else if (p1 != (byte)0x00 && p2 != (byte)0x02) {
 	        ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
         }
         
@@ -407,7 +458,33 @@ public class passwordSafe extends Applet
         }
         
         //Check if P1 and P2 are correct
-        if(p1 != (byte)0x01 && p2 != (byte)0x02) {
+        if ( p1 == (byte)0x01 && p2 == (byte)0x01 ) {
+        	//Decrypt buffer
+	        byte[] tmp1 = new byte[(short)16];
+	        
+	        Util.arrayCopy(buf, offset_cdata, tmp1, (short)0, (short)16);
+	        short L1 = 0,L2 = 0;
+	        tmp1 = decryptData(tmp1, (short)16);
+			L1 = PUK_LENGTH;
+			
+			Util.arrayCopy(tmp1, (short)8, buf, offset_cdata, L1);
+	        
+	        if (lc == (short)16){
+		        byte[] tmp2 = new byte[(short)(lc / 2)];
+		        Util.arrayCopy(buf, (short)(offset_cdata + (lc / 2)), tmp2, (short)0, (short)(lc / 2));
+		        tmp2 = decryptData(tmp2, (short)(lc / 2));
+		        for(short o = 0; o < 16; o++){
+					if (tmp2[o] != (byte)0xFF){
+						L2 = (short)(16 - o);
+						Util.arrayCopy(tmp2, (short)o, buf, (short)(offset_cdata + L1), L2);
+						break;
+					}
+				}
+	        }
+	        
+	        lc = (short)(L1 + L2);
+	        
+        } else if (p1 != (byte)0x01 && p2 != (byte)0x02) {
 	        ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
         }
         
@@ -452,7 +529,16 @@ public class passwordSafe extends Applet
         offset_cdata = apdu.getOffsetCdata();
         
         //Check if P1 and P2 are correct
-        if ( p1 != (byte)0x00 && p2 != (byte)0x00 ) {
+        if (p1 == (byte)0x00 && p2 == (byte)0x01) {
+        	//Decrypt buffer
+	        byte[] tmp1 = new byte[(short)16];
+	        
+	        Util.arrayCopy(buf, offset_cdata, tmp1, (short)0, (short)16);
+	        tmp1 = decryptData(tmp1, (short)16);
+			lc = PUK_LENGTH;
+			
+			Util.arrayCopy(tmp1, (short)8, buf, offset_cdata, lc);	                
+        } else if ( p1 != (byte)0x00 && p2 != (byte)0x00 ) {
 	        ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
         }
 
@@ -502,10 +588,19 @@ public class passwordSafe extends Applet
         }
         
         //Check if P1 and P2 are correct
-        if(p1 != (byte)0x02 && p2 != (byte)0x01) {
+        if (p1 == (byte)0x01 && p2 == (byte)0x01) {
+        	//Decrypt buffer
+	        byte[] tmp1 = new byte[(short)48];
+	        Util.arrayCopy(buf, offset_cdata, tmp1, (short)0, (short)48);
+	        
+	        byte[] dec = decryptData(tmp1, (short)48);
+			lc = (short)dec[0];
+			
+			Util.arrayCopy(dec, (short)(48 - lc), buf, offset_cdata, lc);	                
+        } else if(p1 != (byte)0x02 && p2 != (byte)0x01) {
 	        ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
         }
-        
+
         //Create File for Password and write Data to File
         myfile.createFile(myfile.keepassPW, lc);
         myfile.writeDataToFile(myfile.keepassPW, (short)0, buf, offset_cdata, lc);
@@ -543,7 +638,21 @@ public class passwordSafe extends Applet
         }
         
         //Check if P1 and P2 are correct
-        if(p1 != (byte)0x02 && p2 != (byte)0x02) {
+        if (p1 == (byte)0x01 && p2 == (byte)0x02) {
+	        byte[] tmpsen = new byte[48];
+	        Util.arrayFillNonAtomic(tmpsen, (short)0x00, (short)48, (byte)0x00);
+	        tmpsen[0] = (byte)masterPWlength; 
+	        
+	        short desOff = (short)(48 - (byte)masterPWlength);
+	        byte readLen = (byte)masterPWlength;
+	        byte[] tmp = myfile.readDataFromFile(myfile.keepassPW, (short)0, masterPWlength);
+	        Util.arrayCopy(tmp, (short)0x00, tmpsen, desOff, readLen);
+	        
+	        tmpsen = encryptData(tmpsen, (short)48);
+	        Util.arrayCopy(tmpsen, (short)0, buf, (short)0, (short)48);
+			apdu.setOutgoingAndSend((short) 0, (short)48); 
+			return;
+        } else if(p1 != (byte)0x02 && p2 != (byte)0x02) {
 	        ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
         }
         
@@ -887,5 +996,30 @@ public class passwordSafe extends Applet
         //Read File Name from File and send it back
         Util.arrayCopy(myfile.readDataFromFile(myfile.keepassFileName, (short)0, length), (short)0, buf, (short)0, length);
 		apdu.setOutgoingAndSend((short)0, length);
+	}
+
+	private byte[] encryptData(byte[] decryptedData, short len){
+		Key key = KeyBuilder.buildKey(KeyBuilder.TYPE_AES_TRANSIENT_DESELECT, KeyBuilder.LENGTH_AES_256, false);
+		byte[] enc = new byte[len];
+		((AESKey)key).setKey(aesKey, (short)0);
+		
+		Cipher cipher = Cipher.getInstance(Cipher.ALG_AES_BLOCK_128_ECB_NOPAD, false);
+		cipher.init(key, Cipher.MODE_ENCRYPT);
+		cipher.doFinal(decryptedData, (short)0, len, enc, (short)0);
+		
+		return enc;
+	}
+	
+	private byte[] decryptData(byte[] encryptedData, short len){
+		Key key = KeyBuilder.buildKey(KeyBuilder.TYPE_AES_TRANSIENT_DESELECT, KeyBuilder.LENGTH_AES_256, false);
+		((AESKey)key).setKey(aesKey, (short)0);
+		
+		byte[] dec = new byte[len];
+		
+		Cipher cipher = Cipher.getInstance(Cipher.ALG_AES_BLOCK_128_ECB_NOPAD, false);
+		cipher.init(key, Cipher.MODE_DECRYPT);
+		cipher.doFinal(encryptedData, (short)0, len, dec, (short)0);
+		
+		return dec;
 	}
 }
