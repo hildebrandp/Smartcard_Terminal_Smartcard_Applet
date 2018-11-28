@@ -1,4 +1,14 @@
 <jumpRecord>
-<prevNodes/>
-<nextRecord/>
+<prevNodes>
+<jnode>
+<fileName>C:\workspace\passwordSafe\Smartcard_Terminal_Smartcard_Applet\src\keepassSafe\passwordSafe.java</fileName>
+<line>596</line>
+</jnode>
+</prevNodes>
+<nextRecord>
+<jnode>
+<fileName>C:\workspace\passwordSafe\Smartcard_Terminal_Smartcard_Applet\src\keepassSafe\passwordSafe.java</fileName>
+<line>592</line>
+</jnode>
+</nextRecord>
 </jumpRecord>
